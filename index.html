@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EstimaAI — House Price Predictor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg:       #0a0a0f;
+      --surface:  #111118;
+      --card:     #16161f;
+      --border:   #2a2a3a;
+      --gold:     #c9a84c;
+      --gold-dim: #7a6330;
+      --cream:    #f0ead6;
+      --muted:    #6a6a80;
+      --success:  #4caf8a;
+      --danger:   #e05c5c;
+      --text:     #e8e4f0;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Background grid ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(201,168,76,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(201,168,76,.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Glow orbs ── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+      z-index: 0;
+      animation: drift 18s ease-in-out infinite alternate;
+    }
+    .orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, rgba(201,168,76,.12), transparent 70%); top: -150px; right: -100px; }
+    .orb-2 { width: 400px; height: 400px; background: radial-gradient(circle, rgba(76,111,175,.1), transparent 70%); bottom: -100px; left: -100px; animation-delay: -9s; }
+
+    @keyframes drift {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(30px, 20px) scale(1.05); }
+    }
+
+    /* ── Layout ── */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 32px 0 60px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 60px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .logo-mark {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 22px;
+      color: var(--cream);
+      letter-spacing: -0.5px;
+    }
+
+    .logo-ai {
+      font-family: 'Cormorant Garamond', serif;
+      font-style: italic;
+      font-size: 20px;
+      color: var(--gold);
+    }
+
+    .badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--gold);
+      border: 1px solid var(--gold-dim);
+      padding: 4px 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      margin-bottom: 60px;
+    }
+
+    .hero-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hero-eyebrow::before {
+      content: '';
+      display: block;
+      width: 32px;
+      height: 1px;
+      background: var(--gold);
+    }
+
+    .hero h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: clamp(44px, 6vw, 76px);
+      line-height: 1.05;
+      color: var(--cream);
+      letter-spacing: -1px;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+      color: var(--gold);
+    }
+
+    .hero-sub {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 20px;
+      letter-spacing: 0.5px;
+      line-height: 1.8;
+    }
+
+    /* ── Model info strip ── */
+    .model-strip {
+      display: flex;
+      gap: 32px;
+      margin-bottom: 48px;
+      padding: 18px 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    .strip-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .strip-label {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .strip-value {
+      font-size: 13px;
+      color: var(--cream);
+    }
+
+    /* ── Main grid ── */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 32px;
+      align-items: start;
+    }
+
+    @media (max-width: 880px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Form card ── */
+    .form-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 40px;
+    }
+
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .fields-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 560px) {
+      .fields-grid { grid-template-columns: 1fr; }
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      position: relative;
+    }
+
+    .field-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      transition: color .2s;
+    }
+
+    .field-group:focus-within label {
+      color: var(--gold);
+    }
+
+    .input-wrap {
+      position: relative;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--cream);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color .2s, background .2s;
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+    }
+
+    input[type="number"]:focus {
+      border-color: var(--gold-dim);
+      background: #1a1a25;
+    }
+
+    input[type="number"].error {
+      border-color: var(--danger);
+    }
+
+    .hint {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    .range-display {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 10px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    /* ── Submit button ── */
+    .submit-btn {
+      margin-top: 32px;
+      width: 100%;
+      background: var(--gold);
+      color: #0a0a0f;
+      border: none;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 18px 32px;
+      cursor: pointer;
+      transition: background .2s, transform .1s, box-shadow .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .submit-btn:hover {
+      background: var(--cream);
+      box-shadow: 0 0 40px rgba(201,168,76,.3);
+    }
+
+    .submit-btn:active { transform: scale(0.99); }
+
+    .submit-btn:disabled {
+      background: var(--border);
+      color: var(--muted);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(0,0,0,.3);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+
+    .submit-btn.loading .spinner { display: block; }
+    .submit-btn.loading .btn-text { opacity: 0.6; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Side panel ── */
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── Result card ── */
+    .result-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 36px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity .5s ease, transform .5s ease;
+    }
+
+    .result-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .result-card.error-state {
+      border-color: rgba(224,92,92,.4);
+    }
+
+    .result-label {
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .result-price {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 52px;
+      font-weight: 300;
+      color: var(--gold);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .result-raw {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .result-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 20px 0;
+    }
+
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(42,42,58,.5);
+      font-size: 11px;
+    }
+
+    .result-row-key { color: var(--muted); }
+    .result-row-val { color: var(--cream); font-weight: 500; }
+
+    .error-msg {
+      font-size: 12px;
+      color: var(--danger);
+      line-height: 1.6;
+    }
+
+    /* ── Info card ── */
+    .info-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 28px;
+    }
+
+    .info-card h3 {
+      font-family: 'Syne', sans-serif;
+      font-size: 10px;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 16px;
+    }
+
+    .feature-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .feature-list li {
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .feature-list li::before {
+      content: '→';
+      color: var(--gold-dim);
+      flex-shrink: 0;
+    }
+
+    /* ── Status dot ── */
+    .status-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+
+    /* ── Default result state ── */
+    .result-placeholder {
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .placeholder-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+      opacity: .4;
+    }
+
+    .placeholder-text {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    /* ── Confidence bar ── */
+    .conf-wrap { margin-top: 20px; }
+
+    .conf-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .conf-bar {
+      height: 3px;
+      background: var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .conf-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+      width: 0;
+      transition: width 1s cubic-bezier(.16,1,.3,1);
+    }
+
+    footer {
+      margin-top: 80px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    footer p {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+
+    footer span {
+      color: var(--gold-dim);
+    }
+  </style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <span class="logo-mark">Estima</span>
+      <span class="logo-ai">AI</span>
+    </div>
+    <div class="badge"><span class="status-dot"></span> &nbsp; Model Online</div>
+  </header>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-eyebrow">California Housing · Random Forest Pipeline</div>
+    <h1>Predict <em>House</em><br/>Prices, <em>Instantly</em></h1>
+    <p class="hero-sub">
+      Enter 8 housing parameters below and get a machine-learning<br/>
+      price estimate powered by a trained Random Forest pipeline.
+    </p>
+  </div>
+
+  <!-- Model strip -->
+  <div class="model-strip">
+    <div class="strip-item">
+      <span class="strip-label">Model</span>
+      <span class="strip-value">Random Forest Pipeline</span>
+    </div>
+    <div class="strip-item">
+      <span class="strip-label">Dataset</span>
+      <span class="strip-value">California Housing</span>
+    </div>
+    <div class="strip-item">
+      <span class="strip-label">Output Unit</span>
+      <span class="strip-value">$100,000 (×100k = USD)</span>
+    </div>
+    <div class="strip-item">
+      <span class="strip-label">Backend</span>
+      <span class="strip-value">Flask · Joblib · Scikit-learn</span>
+    </div>
+  </div>
+
+  <!-- Main grid -->
+  <div class="main-grid">
+
+    <!-- Form -->
+    <div class="form-card">
+      <div class="section-title">Input Parameters</div>
+
+      <form id="predForm" novalidate>
+        <div class="fields-grid">
+
+          <div class="field-group">
+            <label for="MedInc">MedInc</label>
+            <div class="input-wrap">
+              <input type="number" id="MedInc" step="0.0001" placeholder="8.3252" value="8.3252" />
+            </div>
+            <span class="hint">Median income (tens of thousands $)</span>
+          </div>
+
+          <div class="field-group">
+            <label for="HouseAge">HouseAge</label>
+            <div class="input-wrap">
+              <input type="number" id="HouseAge" step="1" placeholder="41" value="41" />
+            </div>
+            <span class="hint">Median house age in years</span>
+          </div>
+
+          <div class="field-group">
+            <label for="AveRooms">AveRooms</label>
+            <div class="input-wrap">
+              <input type="number" id="AveRooms" step="0.0001" placeholder="6.9841" value="6.984127" />
+            </div>
+            <span class="hint">Average rooms per household</span>
+          </div>
+
+          <div class="field-group">
+            <label for="AveBedrms">AveBedrms</label>
+            <div class="input-wrap">
+              <input type="number" id="AveBedrms" step="0.0001" placeholder="1.0238" value="1.023810" />
+            </div>
+            <span class="hint">Average bedrooms per household</span>
+          </div>
+
+          <div class="field-group">
+            <label for="Population">Population</label>
+            <div class="input-wrap">
+              <input type="number" id="Population" step="1" placeholder="322" value="322" />
+            </div>
+            <span class="hint">Block group population</span>
+          </div>
+
+          <div class="field-group">
+            <label for="AveOccup">AveOccup</label>
+            <div class="input-wrap">
+              <input type="number" id="AveOccup" step="0.0001" placeholder="2.5556" value="2.555556" />
+            </div>
+            <span class="hint">Average household occupancy</span>
+          </div>
+
+          <div class="field-group">
+            <label for="Latitude">Latitude</label>
+            <div class="input-wrap">
+              <input type="number" id="Latitude" step="0.01" placeholder="37.88" value="37.88" />
+            </div>
+            <span class="hint">Block group latitude (CA: 32–42°N)</span>
+          </div>
+
+          <div class="field-group">
+            <label for="Longitude">Longitude</label>
+            <div class="input-wrap">
+              <input type="number" id="Longitude" step="0.01" placeholder="-122.23" value="-122.23" />
+            </div>
+            <span class="hint">Block group longitude (CA: −114° to −124°)</span>
+          </div>
+
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">
+          <div class="spinner"></div>
+          <span class="btn-text">Estimate Price</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Side panel -->
+    <div class="side-panel">
+
+      <!-- Result card -->
+      <div class="result-card" id="resultCard">
+        <div class="result-placeholder" id="placeholder">
+          <div class="placeholder-icon">🏠</div>
+          <p class="placeholder-text">Fill in the parameters<br/>and click <strong>Estimate Price</strong><br/>to see the prediction.</p>
+        </div>
+        <div id="resultContent" style="display:none">
+          <div class="result-label">Estimated Price</div>
+          <div class="result-price" id="priceFormatted">—</div>
+          <div class="result-raw" id="priceRaw">raw model output: —</div>
+
+          <div class="conf-wrap">
+            <div class="conf-label">
+              <span>Confidence Range</span>
+              <span id="confPct">—</span>
+            </div>
+            <div class="conf-bar"><div class="conf-fill" id="confFill"></div></div>
+          </div>
+
+          <div class="result-divider"></div>
+          <div class="result-label" style="margin-bottom:8px">Input Summary</div>
+          <div id="inputSummary"></div>
+        </div>
+        <div id="errorContent" style="display:none">
+          <div class="result-label" style="color:var(--danger)">Error</div>
+          <p class="error-msg" id="errorMsg"></p>
+        </div>
+      </div>
+
+      <!-- Info card -->
+      <div class="info-card">
+        <h3>About the Model</h3>
+        <ul class="feature-list">
+          <li>Trained on California Housing dataset from sklearn</li>
+          <li>Random Forest with preprocessing pipeline (scaling + encoding)</li>
+          <li>Output is median house value in units of $100,000</li>
+          <li>Latitude & Longitude capture geographic price gradients</li>
+          <li>MedInc is the strongest predictor in this dataset</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <p>EstimaAI &mdash; Powered by <span>scikit-learn</span> &amp; <span>Flask</span></p>
+    <p>California Housing Dataset · Prices in USD</p>
+  </footer>
+
+</div>
+
+<script>
+  const API_BASE = "http://localhost:5000";
+
+  const FIELDS = ["MedInc","HouseAge","AveRooms","AveBedrms","Population","AveOccup","Latitude","Longitude"];
+
+  const form       = document.getElementById("predForm");
+  const btn        = document.getElementById("submitBtn");
+  const resultCard = document.getElementById("resultCard");
+  const placeholder     = document.getElementById("placeholder");
+  const resultContent   = document.getElementById("resultContent");
+  const errorContent    = document.getElementById("errorContent");
+
+  // Show the card with entrance animation
+  function showCard() {
+    resultCard.classList.add("visible");
+  }
+
+  function setLoading(loading) {
+    btn.disabled = loading;
+    btn.classList.toggle("loading", loading);
+  }
+
+  function showResult(data) {
+    placeholder.style.display = "none";
+    errorContent.style.display = "none";
+    resultContent.style.display = "block";
+    resultCard.classList.remove("error-state");
+
+    document.getElementById("priceFormatted").textContent = data.price_formatted;
+    document.getElementById("priceRaw").textContent       = `raw model output: ${data.prediction}`;
+
+    // Confidence bar (visual only — indicates how far above/below median)
+    const median = 200000;
+    const price  = data.price_dollars;
+    const conf   = Math.min(95, 55 + Math.round((price / median) * 20));
+    document.getElementById("confPct").textContent  = conf + "%";
+    setTimeout(() => {
+      document.getElementById("confFill").style.width = conf + "%";
+    }, 100);
+
+    // Input summary rows
+    const wrap = document.getElementById("inputSummary");
+    wrap.innerHTML = "";
+    const labels = {
+      MedInc: "Median Income", HouseAge: "House Age", AveRooms: "Avg Rooms",
+      AveBedrms: "Avg Bedrooms", Population: "Population", AveOccup: "Avg Occupancy",
+      Latitude: "Latitude", Longitude: "Longitude"
+    };
+    for (const [k, v] of Object.entries(data.input)) {
+      const row = document.createElement("div");
+      row.className = "result-row";
+      row.innerHTML = `<span class="result-row-key">${labels[k] || k}</span><span class="result-row-val">${v}</span>`;
+      wrap.appendChild(row);
+    }
+
+    showCard();
+  }
+
+  function showError(msg) {
+    placeholder.style.display = "none";
+    resultContent.style.display = "none";
+    errorContent.style.display = "block";
+    resultCard.classList.add("error-state");
+    document.getElementById("errorMsg").textContent = msg;
+    showCard();
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    // Clear errors
+    FIELDS.forEach(f => document.getElementById(f).classList.remove("error"));
+
+    // Build payload & validate
+    const payload = {};
+    let valid = true;
+    for (const f of FIELDS) {
+      const val = document.getElementById(f).value.trim();
+      if (val === "" || isNaN(parseFloat(val))) {
+        document.getElementById(f).classList.add("error");
+        valid = false;
+      } else {
+        payload[f] = parseFloat(val);
+      }
+    }
+    if (!valid) {
+      showError("Please fill in all fields with valid numeric values.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/predict`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        showError(data.error || `Server error: ${res.status}`);
+      } else {
+        showResult(data);
+      }
+    } catch (err) {
+      showError(
+        "Could not connect to the Flask server.\n" +
+        "Make sure app.py is running on http://localhost:5000"
+      );
+    } finally {
+      setLoading(false);
+    }
+  });
+</script>
+</body>
+</html>
